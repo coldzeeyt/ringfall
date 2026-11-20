@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ringfall · Songs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+<main class="page">
+  <header class="top">
+    <a class="brand" href="./"><span class="l1">ring</span><span class="l2">fall</span></a>
+    <h1>Songs</h1>
+  </header>
+
+  <section id="login" class="card">
+    <h2>Unlock</h2>
+    <form id="loginForm" class="stack">
+      <label>Password<input id="pw" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary">Unlock</button>
+      <p id="loginErr" class="err"></p>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <section class="slots" id="slots"></section>
+
+    <section class="card">
+      <h2 id="formTitle">Put a song on level 1</h2>
+      <form id="up" class="grid">
+        <label>Level
+          <select name="slot" id="slot"><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option></select>
+        </label>
+        <label>Song file<input type="file" name="file" id="file" accept="audio/*"></label>
+        <label>Title<input name="title" id="title" placeholder="Night Drive" maxlength="60"></label>
+        <label>Artist<input name="artist" id="artist" placeholder="8 Arcades" maxlength="60"></label>
+        <label>BPM
+          <div class="inline"><input name="bpm" id="bpm" type="number" min="30" max="400" step="0.01" value="120" required><button type="button" class="btn small" id="tap">Tap</button></div>
+        </label>
+        <label>First beat at (ms)<input name="offsetMs" id="offsetMs" type="number" value="0" step="1"></label>
+        <label>Notes
+          <select name="density" id="density"><option value="easy">Fewer</option><option value="normal" selected>Normal</option><option value="hard">More</option></select>
+        </label>
+        <label class="wide">Chart (optional)
+          <textarea name="chart" id="chart" rows="4" placeholder='[{"b":4,"x":0.5},{"b":6,"x":0.3,"len":2}]'></textarea>
+        </label>
+        <div class="wide row-end">
+          <div class="bar" id="bar" hidden><i id="barFill"></i></div>
+          <button class="btn primary" id="go">Upload</button>
+        </div>
+        <p id="msg" class="wide msg"></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Waterfall mods</h2>
+      <div id="mods" class="modlist"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+let pw = sessionStorage.getItem('rf-admin') || '';
+let levels = {};
+
+async function check() {
+  const r = await fetch('api/admin/check', { method: 'POST', headers: { 'x-admin-password': pw } });
+  return r.ok;
+}
+async function boot() {
+  if (pw && await check()) { $('login').hidden = true; $('app').hidden = false; await refresh(); }
+}
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault(); pw = $('pw').value;
+  if (await check()) { sessionStorage.setItem('rf-admin', pw); boot(); }
+  else $('loginErr').textContent = "That password didn't work.";
+});
+
+async function refresh() {
+  levels = await (await fetch('api/levels', { cache: 'no-store' })).json();
+  $('slots').innerHTML = [1,2,3].map(n => {
+    const l = levels[n];
+    return `<div class="slot ${l ? '' : 'empty'}">
+      <div class="num">${n}</div>
+      <div class="info">${l ? `<b>${esc(l.title)}</b><span>${esc(l.artist || '')}${l.artist ? ' · ' : ''}${l.bpm} BPM${l.chart ? ' · own chart' : ''}</span>` : `<b>Empty</b><span>${n === 1 ? 'built-in test level' : 'coming soon'}</span>`}</div>
+      <div class="acts"><button class="btn small" data-edit="${n}">${l ? 'Change' : 'Add song'}</button>${l ? `<button class="btn small ghost" data-del="${n}">Remove</button>` : ''}</div>
+    </div>`;
+  }).join('');
+  const mods = (await (await fetch('api/mods', { cache: 'no-store' })).json()).mods;
+  $('mods').innerHTML = mods.length ? mods.map(m => `<div class="moditem"><div><b>${esc(m.name)}</b><span>by ${esc(m.author || 'someone')} · ${m.downloads} downloads · ${esc(m.tags.join(', '))}</span></div><button class="btn small ghost" data-moddel="${esc(m.id)}">Take down</button></div>`).join('') : '<p class="muted">No mods yet.</p>';
+}
+
+function fill(n) {
+  const l = levels[n] || {};
+  $('slot').value = n; $('title').value = l.title || ''; $('artist').value = l.artist || '';
+  $('bpm').value = l.bpm || 120; $('offsetMs').value = l.offsetMs || 0; $('density').value = l.density || 'normal';
+  $('chart').value = l.chart ? JSON.stringify(l.chart) : ''; $('file').value = '';
+  $('formTitle').textContent = `Put a song on level ${n}`;
+  $('up').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+$('slot').addEventListener('change', () => fill($('slot').value));
+
+document.addEventListener('click', async e => {
+  const ed = e.target.closest('[data-edit]'), del = e.target.closest('[data-del]'), md = e.target.closest('[data-moddel]');
+  if (ed) fill(ed.dataset.edit);
+  if (del) {
+    if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = 'Sure?'; return; }
+    await fetch('api/admin/remove', { method: 'POST', headers: { 'x-admin-password': pw, 'content-type': 'application/json' }, body: JSON.stringify({ slot: del.dataset.del }) });
+    refresh();
+  }
+  if (md) {
+    if (md.dataset.armed !== '1') { md.dataset.armed = '1'; md.textContent = 'Sure?'; return; }
+    await fetch('api/admin/mods/delete', { method: 'POST', headers: { 'x-admin-password': pw, 'content-type': 'application/json' }, body: JSON.stringify({ id: md.dataset.moddel }) });
+    refresh();
+  }
+});
+
+// tap along to find the BPM
+let taps = [];
+$('tap').addEventListener('click', () => {
+  const now = performance.now();
+  if (taps.length && now - taps[taps.length - 1] > 2000) taps = [];
+  taps.push(now);
+  if (taps.length >= 4) {
+    const gaps = taps.slice(1).map((t, i) => t - taps[i]);
+    const avg = gaps.reduce((a, b) => a + b) / gaps.length;
+    $('bpm').value = (60000 / avg).toFixed(1);
+  }
+  $('tap').textContent = taps.length < 4 ? `Tap ${4 - taps.length}` : 'Tap';
+});
+
+$('file').addEventListener('change', () => {
+  const f = $('file').files[0];
+  if (f && !$('title').value) $('title').value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+});
+
+$('up').addEventListener('submit', e => {
+  e.preventDefault();
+  const fd = new FormData($('up'));
+  const slot = $('slot').value;
+  if (!$('file').files[0] && !(levels[slot] && levels[slot].file)) { $('msg').textContent = 'Add a song file first.'; $('msg').className = 'wide msg err'; return; }
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', 'api/admin/upload');
+  xhr.setRequestHeader('x-admin-password', pw);
+  $('bar').hidden = false; $('go').disabled = true; $('msg').textContent = '';
+  xhr.upload.onprogress = ev => { if (ev.lengthComputable) $('barFill').style.width = (ev.loaded / ev.total * 100) + '%'; };
+  xhr.onload = () => {
+    $('go').disabled = false; $('bar').hidden = true; $('barFill').style.width = '0';
+    let res = {}; try { res = JSON.parse(xhr.responseText); } catch {}
+    if (xhr.status === 200) { $('msg').textContent = `Level ${slot} updated. Reload the game to play it.`; $('msg').className = 'wide msg ok'; refresh(); }
+    else { $('msg').textContent = res.error || 'Upload failed.'; $('msg').className = 'wide msg err'; }
+  };
+  xhr.onerror = () => { $('go').disabled = false; $('msg').textContent = 'Upload failed.'; $('msg').className = 'wide msg err'; };
+  xhr.send(fd);
+});
+
+boot();
+</script>
+</body>
+</html>

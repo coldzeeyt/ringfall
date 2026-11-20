@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waterfall · Ringfall mods</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+<main class="page">
+  <header class="top">
+    <a class="brand" href="./"><span class="l1">ring</span><span class="l2">fall</span></a>
+    <h1 class="wf">waterfall</h1>
+    <span class="spacer"></span>
+    <a class="btn small" href="./">Play</a>
+  </header>
+
+  <div class="maker">
+    <form id="mod" class="card" autocomplete="off">
+      <h2>Make a mod</h2>
+      <div class="grid">
+        <label>Name<input id="name" maxlength="40" placeholder="Sunset Drive" required></label>
+        <label>Your name<input id="author" maxlength="30" placeholder="coldzeey"></label>
+        <label>Version<input id="version" maxlength="12" value="1.0"></label>
+        <label class="wide">What it does<textarea id="description" rows="2" maxlength="280" placeholder="Warm colours, a hand-drawn player and two new songs."></textarea></label>
+      </div>
+
+      <h3>Colours</h3>
+      <div class="presets" id="presets"></div>
+      <div class="swatches" id="swatches"></div>
+
+      <h3>Pictures</h3>
+      <div class="grid">
+        <label>Player<input type="file" id="spPlayer" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+        <label>Tap note<input type="file" id="spTap" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+        <label>Background<input type="file" id="spBg" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+      </div>
+
+      <h3>Sound</h3>
+      <div class="grid">
+        <label>Hit sound<input type="file" id="hitsound" accept="audio/*"></label>
+      </div>
+
+      <h3>Levels</h3>
+      <div class="levels" id="levels"></div>
+      <div style="margin-top:10px"><button type="button" class="btn small" id="addLevel">+ Add a level</button></div>
+
+      <h3>Updating a mod you already made?</h3>
+      <details>
+        <summary>Use your mod ID and key</summary>
+        <div class="grid">
+          <label>Mod ID<input id="modId" placeholder="sunset-drive-k3f9"></label>
+          <label>Key<input id="modKey" placeholder="from when you published"></label>
+          <div class="wide row-end"><button type="button" class="btn small ghost" id="deleteMod">Delete this mod</button></div>
+        </div>
+      </details>
+
+      <div class="row-end" style="margin-top:20px">
+        <div class="bar" id="bar" hidden><i id="barFill"></i></div>
+        <button class="btn primary" id="publish">Publish to Waterfall</button>
+      </div>
+      <p id="msg" class="msg" style="margin-top:10px"></p>
+      <div id="done" class="done-box" hidden></div>
+    </form>
+
+    <aside class="preview">
+      <canvas id="pv" width="760" height="880"></canvas>
+      <details class="card">
+        <summary>Writing a mod by hand</summary>
+        <p class="muted" style="font-size:14px;line-height:1.5;margin-bottom:10px">A mod is a <b>mod.json</b> plus the pictures and sounds it names. Everything here is optional except the name.</p>
+        <textarea id="template" rows="16" readonly></textarea>
+        <p class="muted" style="font-size:13px;line-height:1.5;margin-top:10px">Charts use beats: <b>b</b> is the beat, <b>x</b> is 0 (left) to 1 (right), <b>len</b> makes it a hold. Leave the chart out and Ringfall builds one from the song.</p>
+      </details>
+    </aside>
+  </div>
+
+  <section class="card">
+    <h2>On Waterfall now</h2>
+    <div class="browse" id="browse"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+
+const DEFAULT = { background:'#1c1748', background2:'#26215c', ground:'#16113a', ridge:'#2f2870', track:'#534ab7', accent:'#7f77dd', text:'#eeedfe', soft:'#cecbf6', player:'#ed93b1', ring:'#eeedfe', tap:'#fac775', hold:'#5dcaa5', holdLight:'#9fe1cb' };
+const LABELS = { background:'Sky top', background2:'Sky bottom', ground:'Ground', ridge:'Hills', track:'Track', accent:'Accent', text:'Text', soft:'Soft text', player:'Player', ring:'Ring', tap:'Tap notes', hold:'Hold notes', holdLight:'Hold glow' };
+const PRESETS = {
+  Original: DEFAULT,
+  Sunset: { ...DEFAULT, background:'#2b0f2e', background2:'#6b2a3a', ground:'#1d0a1f', ridge:'#4a1c3b', track:'#c4566e', accent:'#f28b6b', player:'#ffd166', ring:'#fff1e6', tap:'#ff7b9c', hold:'#7bdff2', holdLight:'#c6f4ff', soft:'#ffd9cf', text:'#fff1e6' },
+  Mint: { ...DEFAULT, background:'#06231f', background2:'#0d3b33', ground:'#041815', ridge:'#12503f', track:'#2a9d8f', accent:'#64d3b8', player:'#f6f1d1', ring:'#e9fff8', tap:'#ffb4a2', hold:'#e9c46a', holdLight:'#fff1b8', soft:'#b9eadb', text:'#e9fff8' },
+  Paper: { ...DEFAULT, background:'#ece6d9', background2:'#d9cfbb', ground:'#c2b59b', ridge:'#cbbfa6', track:'#3b3a36', accent:'#6b6860', player:'#d1495b', ring:'#2b2a27', tap:'#2b2a27', hold:'#00798c', holdLight:'#66c3d0', soft:'#5d5a52', text:'#2b2a27' },
+};
+let theme = { ...DEFAULT };
+let changed = new Set();
+
+// colour pickers
+$('swatches').innerHTML = Object.keys(DEFAULT).map(k => `<label class="sw"><input type="color" data-k="${k}" value="${DEFAULT[k]}">${LABELS[k]}</label>`).join('');
+$('swatches').addEventListener('input', e => { const k = e.target.dataset.k; theme[k] = e.target.value; changed.add(k); });
+$('presets').innerHTML = Object.keys(PRESETS).map(p => `<button type="button" class="btn small" data-preset="${p}">${p}</button>`).join('');
+$('presets').addEventListener('click', e => {
+  const p = e.target.dataset.preset; if (!p) return;
+  theme = { ...PRESETS[p] };
+  changed = new Set(p === 'Original' ? [] : Object.keys(theme).filter(k => theme[k] !== DEFAULT[k]));
+  document.querySelectorAll('#swatches input').forEach(i => i.value = theme[i.dataset.k]);
+});
+
+// pictures for the preview
+const imgs = {};
+for (const [id, k] of [['spPlayer','player'],['spTap','tap'],['spBg','background']]) {
+  $(id).addEventListener('change', () => {
+    const f = $(id).files[0];
+    if (!f) { delete imgs[k]; return; }
+    const im = new Image(); im.src = URL.createObjectURL(f); imgs[k] = im;
+  });
+}
+
+// levels
+let lvlCount = 0;
+function addLevel() {
+  const n = ++lvlCount;
+  const el = document.createElement('div');
+  el.className = 'lvl'; el.dataset.n = n;
+  el.innerHTML = `<div class="lvl-head">Level <button type="button" class="btn small ghost" data-rm>Remove</button></div>
+    <div class="grid">
+      <label>Song<input type="file" data-f="music" accept="audio/*" required></label>
+      <label>Title<input data-f="title" maxlength="40"></label>
+      <label>Artist<input data-f="artist" maxlength="40"></label>
+      <label>BPM<input data-f="bpm" type="number" min="30" max="400" step="0.01" value="120" required></label>
+      <label>First beat at (ms)<input data-f="offsetMs" type="number" value="0"></label>
+      <label>Notes<select data-f="density"><option value="easy">Fewer</option><option value="normal" selected>Normal</option><option value="hard">More</option></select></label>
+      <label class="wide">Chart (optional)<textarea data-f="chart" rows="2" placeholder='[{"b":4,"x":0.5},{"b":6,"x":0.3,"len":2}]'></textarea></label>
+    </div>`;
+  el.querySelector('[data-rm]').addEventListener('click', () => el.remove());
+  el.querySelector('[data-f=music]').addEventListener('change', e => {
+    const f = e.target.files[0], t = el.querySelector('[data-f=title]');
+    if (f && !t.value) t.value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+  });
+  $('levels').appendChild(el);
+}
+$('addLevel').addEventListener('click', addLevel);
+
+const extOf = n => (n.split('.').pop() || '').toLowerCase();
+const renamed = (f, base) => new File([f], `${base}.${extOf(f.name)}`, { type: f.type });
+
+function build() {
+  const files = [];
+  const man = {
+    name: $('name').value.trim(), author: $('author').value.trim(), version: $('version').value.trim(),
+    description: $('description').value.trim(), theme: {}, sprites: {}, levels: [],
+  };
+  for (const k of changed) man.theme[k] = theme[k];
+  for (const [id, k] of [['spPlayer','player'],['spTap','tap'],['spBg','background']]) {
+    const f = $(id).files[0]; if (f) { const r = renamed(f, k); files.push(r); man.sprites[k] = r.name; }
+  }
+  const hs = $('hitsound').files[0]; if (hs) { const r = renamed(hs, 'hit'); files.push(r); man.hitsound = r.name; }
+  document.querySelectorAll('.lvl').forEach((el, i) => {
+    const get = f => el.querySelector(`[data-f=${f}]`);
+    const song = get('music').files[0];
+    if (!song) throw new Error(`Level ${i + 1} needs a song`);
+    const r = renamed(song, 'level' + (i + 1)); files.push(r);
+    let chart = null;
+    const raw = get('chart').value.trim();
+    if (raw) { try { chart = JSON.parse(raw); } catch { throw new Error(`Level ${i + 1}: the chart isn't valid JSON`); } }
+    man.levels.push({ title: get('title').value.trim(), artist: get('artist').value.trim(), bpm: Number(get('bpm').value), offsetMs: Number(get('offsetMs').value) || 0, density: get('density').value, music: r.name, chart });
+  });
+  return { man, files };
+}
+
+$('mod').addEventListener('submit', e => {
+  e.preventDefault();
+  let b; try { b = build(); } catch (err) { return say(err.message, 'err'); }
+  const fd = new FormData();
+  fd.append('manifest', JSON.stringify(b.man));
+  for (const f of b.files) fd.append('files', f);
+  if ($('modId').value.trim()) { fd.append('modId', $('modId').value.trim()); fd.append('modKey', $('modKey').value.trim()); }
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', 'api/mods');
+  $('bar').hidden = false; $('publish').disabled = true; say('');
+  xhr.upload.onprogress = ev => { if (ev.lengthComputable) $('barFill').style.width = (ev.loaded / ev.total * 100) + '%'; };
+  xhr.onload = () => {
+    $('publish').disabled = false; $('bar').hidden = true; $('barFill').style.width = 0;
+    let res = {}; try { res = JSON.parse(xhr.responseText); } catch {}
+    if (xhr.status !== 200) return say(res.error || 'Publishing failed.', 'err');
+    say('');
+    $('done').hidden = false;
+    $('done').innerHTML = res.key
+      ? `<b>${esc(b.man.name)} is on Waterfall.</b><span>Players can find it under Waterfall in the game.</span><span>Keep these to update or delete it later:</span><span>Mod ID <code>${esc(res.id)}</code></span><span>Key <code>${esc(res.key)}</code></span>`
+      : `<b>${esc(b.man.name)} is updated.</b><span>Players get the new version next time they install it.</span>`;
+    loadBrowse();
+  };
+  xhr.onerror = () => { $('publish').disabled = false; say('Publishing failed.', 'err'); };
+  xhr.send(fd);
+});
+
+$('deleteMod').addEventListener('click', async e => {
+  const id = $('modId').value.trim(), key = $('modKey').value.trim();
+  if (!id || !key) return say('Fill in the mod ID and key first.', 'err');
+  if (e.target.dataset.armed !== '1') { e.target.dataset.armed = '1'; e.target.textContent = 'Click again to delete'; return; }
+  const r = await fetch(`api/mods/${encodeURIComponent(id)}/delete`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key }) });
+  const res = await r.json().catch(() => ({}));
+  say(r.ok ? 'Mod deleted.' : (res.error || 'Could not delete.'), r.ok ? 'ok' : 'err');
+  e.target.dataset.armed = ''; e.target.textContent = 'Delete this mod';
+  loadBrowse();
+});
+
+function say(t, kind) { $('msg').textContent = t; $('msg').className = 'msg ' + (kind || ''); }
+
+async function loadBrowse() {
+  const { mods } = await (await fetch('api/mods', { cache: 'no-store' })).json();
+  $('browse').innerHTML = mods.length ? mods.map(m => {
+    const t = m.theme || {};
+    const th = m.thumb ? `<img src="${esc(m.thumb)}" alt="">` : [t.background2 || '#26215c', t.player || '#ed93b1', t.tap || '#fac775', t.hold || '#5dcaa5'].map(c => `<i style="background:${esc(c)}"></i>`).join('');
+    return `<div class="mcard"><div class="th">${th}</div><div><b>${esc(m.name)}</b><span>by ${esc(m.author || 'someone')} · ${m.downloads} downloads</span><br><span>${esc((m.tags || []).join(' · '))}</span></div></div>`;
+  }).join('') : '<p class="muted">Nothing here yet. Yours could be first.</p>';
+}
+
+// the template
+$('template').value = JSON.stringify({
+  name: 'Sunset Drive', author: 'you', version: '1.0', description: 'Warm colours and a new song.',
+  theme: { background: '#2b0f2e', background2: '#6b2a3a', player: '#ffd166', tap: '#ff7b9c', hold: '#7bdff2' },
+  sprites: { player: 'player.png', tap: 'tap.png', background: 'background.jpg' },
+  hitsound: 'hit.wav',
+  levels: [{ title: 'Night Drive', artist: 'you', bpm: 128, offsetMs: 0, music: 'night-drive.mp3', density: 'normal', chart: [{ b: 4, x: 0.5 }, { b: 6, x: 0.3, len: 2 }] }],
+}, null, 2);
+
+// live preview
+const cv = $('pv'), g = cv.getContext('2d');
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+function drawPreview(t) {
+  const W = cv.width, H = cv.height, s = 2, ty = H * 0.72;
+  const sky = g.createLinearGradient(0, 0, 0, ty); sky.addColorStop(0, theme.background); sky.addColorStop(1, theme.background2);
+  g.fillStyle = sky; g.fillRect(0, 0, W, ty);
+  if (imgs.background && imgs.background.complete) { const im = imgs.background, sc = Math.max(W / im.width, H / im.height); g.globalAlpha = .55; g.drawImage(im, (W - im.width * sc) / 2, (H - im.height * sc) / 2, im.width * sc, im.height * sc); g.globalAlpha = 1; }
+  for (let i = 0; i < 40; i++) { g.fillStyle = rgba(theme.text, .3 + .3 * Math.sin(t / 600 + i)); g.fillRect((i * 97) % W, (i * 53) % (ty - 40), 2, 2); }
+  g.fillStyle = rgba(theme.ridge, .9); g.beginPath(); g.moveTo(0, ty);
+  [0, .5, .3, .8, .4, .7, .2, .6, .35, .9, .3].forEach((h, i, a) => g.lineTo(W * i / (a.length - 1), ty - h * 110));
+  g.lineTo(W, ty); g.fill();
+  g.fillStyle = theme.ground; g.fillRect(0, ty, W, H - ty);
+  for (let i = 0; i < 28; i++) { const h = (0.2 + 0.8 * Math.abs(Math.sin(t / 400 + i * .7))) * 60; g.fillStyle = rgba(theme.accent, .25); g.fillRect(i * W / 28 + 4, H - h, W / 28 - 8, h); }
+  g.strokeStyle = theme.track; g.lineWidth = 2 * s; g.lineCap = 'round'; g.beginPath(); g.moveTo(40, ty); g.lineTo(W - 40, ty); g.stroke();
+  const px = W * 0.6;
+  g.fillStyle = theme.hold; g.beginPath(); g.roundRect(px - 14, 60, 28, ty - 90, 14); g.fill();
+  for (const [x, off] of [[W * .22, 0], [W * .82, 220], [W * .4, 420]]) {
+    const y = ((t / 4 + off) % (ty + 60)) - 30;
+    if (imgs.tap && imgs.tap.complete) g.drawImage(imgs.tap, x - 24, y - 24, 48, 48);
+    else { g.fillStyle = theme.tap; g.beginPath(); g.arc(x, y, 20, 0, 7); g.fill(); }
+  }
+  if (imgs.player && imgs.player.complete) g.drawImage(imgs.player, px - 36, ty - 36, 72, 72);
+  else { g.fillStyle = theme.player; g.beginPath(); g.arc(px, ty, 36, 0, 7); g.fill(); }
+  g.fillStyle = theme.hold; g.beginPath(); g.arc(px, ty, 20, 0, 7); g.fill();
+  const pulse = Math.exp(-((t / 500) % 1) * 6);
+  g.strokeStyle = theme.ring; g.lineWidth = 2.4 + pulse * 2; g.beginPath(); g.arc(px, ty, 52 * (1 + pulse * .06), 0, 7); g.stroke();
+  g.strokeStyle = theme.holdLight; g.lineWidth = 10; g.beginPath(); g.arc(px, ty, 52, Math.PI * 1.25, Math.PI * 1.75); g.stroke();
+  g.fillStyle = theme.text; g.font = '600 26px Rubik, sans-serif'; g.fillText('12,480', 30, 50);
+  g.textAlign = 'right'; g.fillText('32', W - 30, 50); g.textAlign = 'left';
+  requestAnimationFrame(drawPreview);
+}
+requestAnimationFrame(drawPreview);
+loadBrowse();
+</script>
+</body>
+</html>
