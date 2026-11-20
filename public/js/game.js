@@ -60,9 +60,13 @@ export class Game {
   // The game draws on a small canvas that the page scales up without smoothing: chunky pixels.
   resize() {
     const PX = this.PX = clamp(Math.round(innerHeight / 210), 2, 6);
+    // The art is drawn in big "art pixels", but the canvas is full resolution, so sprites can sit
+    // between art pixels and glide smoothly instead of hopping a whole block at a time.
+    const dpr = Math.min(devicePixelRatio || 1, 2);
     this.W = Math.ceil(innerWidth / PX); this.H = Math.ceil(innerHeight / PX);
-    this.cv.width = this.W; this.cv.height = this.H;
-    this.g.setTransform(1, 0, 0, 1, 0, 0);
+    this.cv.width = Math.ceil(innerWidth * dpr); this.cv.height = Math.ceil(innerHeight * dpr);
+    this.k = PX * dpr;
+    this.g.setTransform(this.k, 0, 0, this.k, 0, 0);
     this.g.imageSmoothingEnabled = false;
     const pfW = Math.min(this.W * 0.92, 640 / PX);
     this.s = clamp(Math.min(pfW / 360, this.H / 520), 0.3, 1.9);
@@ -75,13 +79,14 @@ export class Game {
   }
   xpx(x) { return lerp(this.trackL, this.trackR, x); }
 
-  // ---- pixel drawing: everything snaps to whole pixels ----
+  // ---- pixel drawing: shapes are made of art pixels, positions snap to screen pixels ----
+  snap(v) { return Math.round(v * this.k) / this.k; }
   disc(x, y, r) {
-    const g = this.g; r = Math.max(1, Math.round(r)); x = Math.round(x); y = Math.round(y);
+    const g = this.g; r = Math.max(1, Math.round(r)); x = this.snap(x); y = this.snap(y);
     for (let dy = -r; dy <= r; dy++) { const w = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy))); g.fillRect(x - w, y + dy, w * 2 + 1, 1); }
   }
   ringPx(x, y, r, t = 1, onlyTop = false) {
-    const g = this.g; x = Math.round(x); y = Math.round(y);
+    const g = this.g; x = this.snap(x); y = this.snap(y);
     const ro = Math.round(r), ri = Math.max(0, ro - Math.max(1, Math.round(t)));
     for (let dy = -ro; dy <= ro; dy++) {
       if (onlyTop && dy > -ri * 0.55) break;
@@ -92,7 +97,7 @@ export class Game {
     }
   }
   pill(x, y, w, h) { // rectangle with the corners nipped off
-    const g = this.g; x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+    const g = this.g; x = this.snap(x); y = this.snap(y); w = Math.round(w); h = Math.round(h);
     if (h < 3 || w < 3) { g.fillRect(x, y, w, h); return; }
     g.fillRect(x + 1, y, w - 2, h); g.fillRect(x, y + 1, w, h - 2);
   }
@@ -432,7 +437,7 @@ export class Game {
     for (const p of this.particles) {
       g.globalAlpha = p.life / p.max > 0.5 ? 1 : 0.6;
       const sz = Math.max(1, Math.round(p.r));
-      g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y), sz, sz);
+      g.fillStyle = p.col; g.fillRect(this.snap(p.x), this.snap(p.y), sz, sz);
     }
     g.globalAlpha = 1;
     g.restore();
@@ -537,7 +542,7 @@ export class Game {
         grad.addColorStop(0, rgba(THEME.hold, 0.55)); grad.addColorStop(0.2, COL.teal); grad.addColorStop(1, COL.teal);
         g.fillStyle = grad;
         this.pill(x - w / 2, top, w, h);
-        g.fillStyle = rgba(THEME.holdLight, 0.5); g.fillRect(Math.round(x - w / 2 + 1), Math.round(top + 1), 1, Math.max(0, Math.round(h - 2))); // edge light
+        g.fillStyle = rgba(THEME.holdLight, 0.5); g.fillRect(this.snap(x - w / 2 + 1), this.snap(top + 1), 1, Math.max(0, Math.round(h - 2))); // edge light
         if (n.state === 0) { g.fillStyle = COL.tealLt; this.disc(x, bot - w / 2, Math.max(1, w * 0.25)); }
         g.globalAlpha = 1;
       } else {
@@ -551,7 +556,7 @@ export class Game {
         } else {
           g.fillStyle = rgba(THEME.tap, 0.2); this.ringPx(x, y, this.NR * 1.6, 1);
           g.fillStyle = COL.yellow; this.disc(x, y, this.NR);
-          g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(Math.round(x - this.NR * 0.45), Math.round(y - this.NR * 0.5), Math.max(1, Math.round(this.NR * 0.35)), Math.max(1, Math.round(this.NR * 0.35)));
+          g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(this.snap(x - this.NR * 0.45), this.snap(y - this.NR * 0.5), Math.max(1, Math.round(this.NR * 0.35)), Math.max(1, Math.round(this.NR * 0.35)));
         }
         g.globalAlpha = 1;
       }
