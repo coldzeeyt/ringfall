@@ -334,10 +334,15 @@ addEventListener('keydown', e => {
   konami = e.code === KONAMI[konami] ? konami + 1 : (e.code === KONAMI[0] ? 1 : 0);
   if (konami === KONAMI.length) { konami = 0; togglePixel(); }
 }, true);
-document.querySelector('#screen-menu .logo').addEventListener('click', () => {
+// the menu lets clicks fall through to the game, so check where the click landed
+addEventListener('pointerdown', e => {
+  if (!$('screen-menu').classList.contains('active')) return;
+  const r = document.querySelector('#screen-menu .logo').getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+  e.stopImmediatePropagation(); // a click on the logo isn't a hit
   clearTimeout(logoTimer); logoTimer = setTimeout(() => logoClicks = 0, 1500);
   if (++logoClicks >= 8) { logoClicks = 0; togglePixel(); }
-});
+}, true);
 $('pixelRow').hidden = !settings.pixelFound;
 $('pixelBtn').classList.toggle('on', settings.pixel);
 $('pixelBtn').addEventListener('click', togglePixel);
