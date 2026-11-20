@@ -22,7 +22,8 @@ export const DIFFICULTY = {
   normal: { label: 'Normal', perfect: 0.055, good: 0.12,  ring: 1,    speed: 1,    dmg: 0.08, score: 1 },
   hard:   { label: 'Hard',   perfect: 0.038, good: 0.085, ring: 0.8,  speed: 1.35, dmg: 0.16, score: 1.3 },
 };
-const FONT = '"Rubik", system-ui, sans-serif';
+const FONT = '"Press Start 2P", monospace';
+const px8 = n => Math.max(8, Math.round(n / 8) * 8); // pixel font looks right on multiples of 8
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -56,13 +57,15 @@ export class Game {
   }
 
   // ---------------- layout ----------------
+  // The game draws on a small canvas that the page scales up without smoothing: chunky pixels.
   resize() {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    this.W = innerWidth; this.H = innerHeight;
-    this.cv.width = this.W * dpr; this.cv.height = this.H * dpr;
-    this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const pfW = Math.min(this.W * 0.92, 640);
-    this.s = clamp(Math.min(pfW / 360, this.H / 520), 0.85, 1.9);
+    const PX = this.PX = clamp(Math.round(innerHeight / 210), 2, 6);
+    this.W = Math.ceil(innerWidth / PX); this.H = Math.ceil(innerHeight / PX);
+    this.cv.width = this.W; this.cv.height = this.H;
+    this.g.setTransform(1, 0, 0, 1, 0, 0);
+    this.g.imageSmoothingEnabled = false;
+    const pfW = Math.min(this.W * 0.92, 640 / PX);
+    this.s = clamp(Math.min(pfW / 360, this.H / 520), 0.3, 1.9);
     this.trackL = (this.W - pfW) / 2 + 12 * this.s;
     this.trackR = (this.W + pfW) / 2 - 12 * this.s;
     this.trackY = Math.round(this.H * 0.74);
@@ -71,6 +74,28 @@ export class Game {
     this.NR = 10 * this.s;       // tap note radius
   }
   xpx(x) { return lerp(this.trackL, this.trackR, x); }
+
+  // ---- pixel drawing: everything snaps to whole pixels ----
+  disc(x, y, r) {
+    const g = this.g; r = Math.max(1, Math.round(r)); x = Math.round(x); y = Math.round(y);
+    for (let dy = -r; dy <= r; dy++) { const w = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy))); g.fillRect(x - w, y + dy, w * 2 + 1, 1); }
+  }
+  ringPx(x, y, r, t = 1, onlyTop = false) {
+    const g = this.g; x = Math.round(x); y = Math.round(y);
+    const ro = Math.round(r), ri = Math.max(0, ro - Math.max(1, Math.round(t)));
+    for (let dy = -ro; dy <= ro; dy++) {
+      if (onlyTop && dy > -ri * 0.55) break;
+      const o = Math.round(Math.sqrt(Math.max(0, ro * ro - dy * dy)));
+      const i = Math.abs(dy) < ri ? Math.round(Math.sqrt(ri * ri - dy * dy)) : -1;
+      if (i < 0) g.fillRect(x - o, y + dy, o * 2 + 1, 1);
+      else { g.fillRect(x - o, y + dy, o - i, 1); g.fillRect(x + i + 1, y + dy, o - i, 1); }
+    }
+  }
+  pill(x, y, w, h) { // rectangle with the corners nipped off
+    const g = this.g; x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+    if (h < 3 || w < 3) { g.fillRect(x, y, w, h); return; }
+    g.fillRect(x + 1, y, w - 2, h); g.fillRect(x, y + 1, w, h - 2);
+  }
 
   setSprites(overrides) {
     this.images = {};
@@ -82,7 +107,7 @@ export class Game {
 
   // ---------------- input ----------------
   pointerMove(e) {
-    const x = (e.clientX - this.trackL) / (this.trackR - this.trackL);
+    const x = (e.clientX / this.PX - this.trackL) / (this.trackR - this.trackL);
     this.target = clamp(x, 0, 1);
     if (e.pointerType !== 'mouse' && e.type === 'pointerdown') this.px = this.target;
   }
@@ -392,8 +417,7 @@ export class Game {
     g.fillStyle = beam; g.fillRect(pxp - this.R, ty - H * 0.6, this.R * 2, H * 0.6);
 
     // track
-    g.strokeStyle = COL.track; g.lineWidth = 2 * s; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(this.trackL, ty); g.lineTo(this.trackR, ty); g.stroke();
+    g.fillStyle = COL.track; g.fillRect(Math.round(this.trackL), Math.round(ty) - 1, Math.round(this.trackR - this.trackL), Math.max(2, Math.round(2 * s)));
 
     if (this.mode === 'menu' || this.mode === 'levels') { this.drawDeco(); this.drawPortals(pulse); }
     else this.drawNotes(t);
@@ -402,13 +426,13 @@ export class Game {
 
     for (const b of this.bursts) {
       g.globalAlpha = Math.max(0, b.a) * 0.8;
-      g.strokeStyle = b.col; g.lineWidth = (b.big ? 3 : 2) * s;
-      g.beginPath(); g.arc(this.xpx(b.x), ty, b.r, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = b.col; this.ringPx(this.xpx(b.x), ty, b.r, b.big ? 2 : 1);
     }
     g.globalAlpha = 1;
     for (const p of this.particles) {
-      g.globalAlpha = Math.max(0, p.life / p.max);
-      g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = p.life / p.max > 0.5 ? 1 : 0.6;
+      const sz = Math.max(1, Math.round(p.r));
+      g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y), sz, sz);
     }
     g.globalAlpha = 1;
     g.restore();
@@ -417,8 +441,8 @@ export class Game {
       const a = p.life / p.max;
       g.globalAlpha = Math.min(1, a * 2);
       g.fillStyle = p.col;
-      g.font = `800 ${Math.round(15 * s)}px ${FONT}`;
-      g.letterSpacing = `${2 * s}px`;
+      g.font = `${px8(15 * s)}px ${FONT}`;
+      g.letterSpacing = '0px';
       g.fillText(p.text, this.xpx(p.x), flipY(p.y));
     }
     g.letterSpacing = '0px';
@@ -432,7 +456,7 @@ export class Game {
         const frac = (go - t) % 1;
         g.globalAlpha = Math.min(1, frac * 2.2);
         g.fillStyle = COL.text;
-        g.font = `800 ${Math.round(84 * s * (0.9 + frac * 0.2))}px ${FONT}`;
+        g.font = `${px8(84 * s)}px ${FONT}`;
         g.fillText(String(n), W / 2, H * 0.42);
         g.globalAlpha = 1;
       }
@@ -444,8 +468,8 @@ export class Game {
     g.globalAlpha = 0.28;
     for (const d of this.deco) {
       const x = this.xpx(d.x);
-      if (d.hold) { g.fillStyle = COL.teal; this.roundRect(x - 7 * this.s, d.y - d.len, 14 * this.s, d.len, 7 * this.s); }
-      else { g.fillStyle = COL.yellow; g.beginPath(); g.arc(x, d.y, this.NR, 0, Math.PI * 2); g.fill(); }
+      if (d.hold) { g.fillStyle = COL.teal; this.pill(x - 7 * this.s, d.y - d.len, 14 * this.s, d.len); }
+      else { g.fillStyle = COL.yellow; this.disc(x, d.y, this.NR); }
     }
     g.globalAlpha = 1;
   }
@@ -453,7 +477,7 @@ export class Game {
   drawPortals(pulse) {
     const g = this.g, s = this.s, ty = this.trackY;
     g.textAlign = 'center';
-    for (const p of this.portals) {
+    this.portals.forEach((p, i) => {
       const shake = p.shake ? Math.sin(p.shake * 40) * 6 * s * p.shake : 0;
       const x = this.xpx(p.x) + shake, k = p.glow;
       const sel = this.selecting === p;
@@ -463,31 +487,30 @@ export class Game {
       col.addColorStop(0, rgba(THEME.player, 0.04 + k * 0.16)); col.addColorStop(1, rgba(THEME.player, 0));
       g.fillStyle = col; g.fillRect(x - this.R * 0.9, ty - 150 * s, this.R * 1.8, 150 * s);
       // little post the gate hangs from
-      g.strokeStyle = rgba(THEME.accent, 0.35 + k * 0.4); g.lineWidth = 1.5 * s;
-      g.beginPath(); g.moveTo(x, ty - this.R * 0.7); g.lineTo(x, ty - 36 * s); g.stroke();
+      g.fillStyle = rgba(THEME.accent, 0.35 + k * 0.4);
+      g.fillRect(Math.round(x), Math.round(ty - 36 * s), 1, Math.round(36 * s - this.R * 0.7));
 
       // the gate: a ring sitting on the track
       g.globalAlpha = p.locked ? 0.45 : 1;
-      g.strokeStyle = k > 0.5 ? COL.white : COL.violet;
-      g.lineWidth = (1.4 + k * 1.4 + (k > 0.5 ? pulse * 1.2 : 0)) * s;
+      g.fillStyle = k > 0.5 ? COL.white : COL.violet;
       const r = this.R * (0.62 + k * 0.08 + (sel ? 0.2 : 0));
-      g.beginPath(); g.arc(x, ty, r, 0, Math.PI * 2); g.stroke();
+      this.ringPx(x, ty, r, k > 0.5 && pulse > 0.5 ? 2 : 1);
       g.fillStyle = p.locked ? COL.track : COL.yellow;
-      g.beginPath(); g.arc(x, ty, 4.5 * s * (1 + k * 0.5), 0, Math.PI * 2); g.fill();
+      this.disc(x, ty, Math.max(1, 4.5 * s * (1 + k * 0.5)));
 
       // label
-      const ly = ty - 58 * s - k * 8 * s;
+      const ly = Math.round(ty - 44 * s - (i % 2 ? 22 : 0) - (k > 0.5 ? 2 : 0));
       g.fillStyle = k > 0.5 ? COL.text : COL.lav;
-      g.globalAlpha = (p.locked ? 0.45 : 0.75) + k * 0.25;
-      g.font = `${p.big ? 800 : 600} ${Math.round((p.big ? 26 : 19) * s * (1 + k * 0.08))}px ${FONT}`;
+      g.globalAlpha = (p.locked ? 0.45 : 0.7) + k * 0.3;
+      g.font = `8px ${FONT}`;
       g.fillText(p.label, x, ly);
-      if (p.sub) {
-        g.font = `400 ${Math.round(12.5 * s)}px ${FONT}`;
-        g.fillStyle = COL.lav; g.globalAlpha *= 0.85;
-        g.fillText(p.sub, x, ly + 20 * s);
+      if (p.sub && k > 0.5) {
+        g.font = `8px ${FONT}`;
+        g.fillStyle = COL.lav; g.globalAlpha = 0.8;
+        g.fillText(p.sub, x, ly + 11);
       }
       g.globalAlpha = 1;
-    }
+    });
   }
 
   drawNotes(t) {
@@ -513,11 +536,9 @@ export class Game {
         const grad = g.createLinearGradient(0, top, 0, top + h);
         grad.addColorStop(0, rgba(THEME.hold, 0.55)); grad.addColorStop(0.2, COL.teal); grad.addColorStop(1, COL.teal);
         g.fillStyle = grad;
-        this.roundRect(x - w / 2, top, w, h, w / 2);
-        if (n.state === 0) {
-          g.fillStyle = COL.tealLt;
-          g.beginPath(); g.arc(x, bot - w / 2, w * 0.28, 0, Math.PI * 2); g.fill();
-        }
+        this.pill(x - w / 2, top, w, h);
+        g.fillStyle = rgba(THEME.holdLight, 0.5); g.fillRect(Math.round(x - w / 2 + 1), Math.round(top + 1), 1, Math.max(0, Math.round(h - 2))); // edge light
+        if (n.state === 0) { g.fillStyle = COL.tealLt; this.disc(x, bot - w / 2, Math.max(1, w * 0.25)); }
         g.globalAlpha = 1;
       } else {
         if (n.state === 2) continue;
@@ -528,10 +549,9 @@ export class Game {
         if (img && img.complete && img.naturalWidth) {
           g.drawImage(img, x - this.NR * 1.2, y - this.NR * 1.2, this.NR * 2.4, this.NR * 2.4);
         } else {
-          g.fillStyle = rgba(THEME.tap, 0.18);
-          g.beginPath(); g.arc(x, y, this.NR * 1.7, 0, Math.PI * 2); g.fill();
-          g.fillStyle = COL.yellow;
-          g.beginPath(); g.arc(x, y, this.NR, 0, Math.PI * 2); g.fill();
+          g.fillStyle = rgba(THEME.tap, 0.2); this.ringPx(x, y, this.NR * 1.6, 1);
+          g.fillStyle = COL.yellow; this.disc(x, y, this.NR);
+          g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(Math.round(x - this.NR * 0.45), Math.round(y - this.NR * 0.5), Math.max(1, Math.round(this.NR * 0.35)), Math.max(1, Math.round(this.NR * 0.35)));
         }
         g.globalAlpha = 1;
       }
@@ -542,26 +562,18 @@ export class Game {
     const g = this.g, s = this.s, ty = this.trackY, x = this.xpx(this.px);
     const img = this.images.player;
     if (img && img.complete && img.naturalWidth) {
-      g.drawImage(img, x - this.PR, ty - this.PR, this.PR * 2, this.PR * 2);
+      g.drawImage(img, Math.round(x - this.PR), Math.round(ty - this.PR), Math.round(this.PR * 2), Math.round(this.PR * 2));
     } else {
-      g.fillStyle = COL.pink;
-      g.beginPath(); g.arc(x, ty, this.PR, 0, Math.PI * 2); g.fill();
+      g.fillStyle = rgba(THEME.ground, 0.9); this.disc(x + 1, ty + 1, this.PR);   // hard drop shadow
+      g.fillStyle = COL.pink; this.disc(x, ty, this.PR);
+      g.fillStyle = 'rgba(255,255,255,0.45)'; this.disc(x - this.PR * 0.35, ty - this.PR * 0.4, Math.max(1, this.PR * 0.22)); // shine
     }
-    if (this.fill > 0.01) {
-      g.fillStyle = COL.teal;
-      g.beginPath(); g.arc(x, ty, this.PR * this.fill, 0, Math.PI * 2); g.fill();
-    }
+    if (this.fill > 0.01) { g.fillStyle = COL.teal; this.disc(x, ty, this.PR * this.fill); }
     const r = this.ringR() * (1 + pulse * 0.07);
-    g.strokeStyle = COL.white; g.globalAlpha = 0.75 + pulse * 0.25;
-    g.lineWidth = (1.2 + pulse * 1.3) * s;
-    g.beginPath(); g.arc(x, ty, r, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = COL.white; g.globalAlpha = 0.75 + pulse * 0.25;
+    this.ringPx(x, ty, r, pulse > 0.5 ? 2 : 1);
     g.globalAlpha = 1;
-    if (this.holding) {
-      g.strokeStyle = COL.tealLt; g.lineWidth = 5 * s; g.lineCap = 'round';
-      g.shadowColor = COL.teal; g.shadowBlur = 14 * s;
-      g.beginPath(); g.arc(x, ty, r, Math.PI * 1.25, Math.PI * 1.75); g.stroke();
-      g.shadowBlur = 0;
-    }
+    if (this.holding) { g.fillStyle = COL.tealLt; this.ringPx(x, ty, r + 1, Math.max(2, 3 * s), true); }
   }
 
   roundRect(x, y, w, h, r) {

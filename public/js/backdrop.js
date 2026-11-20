@@ -1,8 +1,16 @@
 // The world behind the track: stars, slow rings, hills, drifting shapes,
 // and bars along the ground that move with the music.
-import { THEME, rgba } from './theme.js';
+import { THEME, rgba, mix } from './theme.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
+
+const GLYPHS = {
+  plus:   ['..#..', '..#..', '#####', '..#..', '..#..'],
+  tri:    ['..#..', '.#.#.', '#...#', '#####', '.....'],
+  ring:   ['.###.', '#...#', '#...#', '#...#', '.###.'],
+  square: ['#####', '#...#', '#...#', '#...#', '#####'],
+  dot:    ['.....', '.##..', '.##..', '.....', '.....'],
+};
 
 export class Backdrop {
   constructor() {
@@ -68,9 +76,9 @@ export class Backdrop {
 
   draw(g, W, H, s, trackY, playerX, pulse, bgImage) {
     // sky
-    const sky = g.createLinearGradient(0, 0, 0, trackY);
-    sky.addColorStop(0, THEME.background); sky.addColorStop(1, THEME.background2);
-    g.fillStyle = sky; g.fillRect(0, 0, W, trackY + 1);
+    // sky in flat bands, like an old console
+    const bands = 10, bh = Math.ceil(trackY / bands);
+    for (let i = 0; i < bands; i++) { g.fillStyle = mix(THEME.background, THEME.background2, i / (bands - 1)); g.fillRect(0, i * bh, W, bh + 1); }
 
     if (bgImage && bgImage.complete && bgImage.naturalWidth) {
       const sc = Math.max(W / bgImage.naturalWidth, H / bgImage.naturalHeight);
@@ -86,18 +94,19 @@ export class Backdrop {
       g.globalAlpha = (0.15 + tw * 0.55) * st.z;
       g.fillStyle = THEME.text;
       const x = st.x * W - (playerX - 0.5) * 30 * st.z * s, y = st.y * trackY;
-      const r = st.z > 0.85 ? 1.6 * s : 1 * s;
-      g.fillRect(x, y, r, r);
+      const xi = Math.round(x), yi = Math.round(y);
+      g.fillRect(xi, yi, 1, 1);
+      if (st.z > 0.9 && tw > 0.7) { g.globalAlpha *= 0.6; g.fillRect(xi - 1, yi, 3, 1); g.fillRect(xi, yi - 1, 1, 3); } // twinkle cross
     }
     g.globalAlpha = 1;
 
     // shooting star
     if (this.shoot) {
-      const sh = this.shoot, x = sh.x * W, y = sh.y * trackY;
-      const tail = g.createLinearGradient(x, y, x - 90 * s, y - 24 * s);
-      tail.addColorStop(0, rgba(THEME.text, 0.8 * Math.min(1, sh.life * 2))); tail.addColorStop(1, rgba(THEME.text, 0));
-      g.strokeStyle = tail; g.lineWidth = 1.5 * s;
-      g.beginPath(); g.moveTo(x, y); g.lineTo(x - 90 * s, y - 24 * s); g.stroke();
+      const sh = this.shoot, x = sh.x * W, y = sh.y * trackY, n = Math.round(60 * s);
+      for (let i = 0; i < n; i++) {
+        g.fillStyle = rgba(THEME.text, (1 - i / n) * 0.8 * Math.min(1, sh.life * 2));
+        g.fillRect(Math.round(x - i), Math.round(y - i * 0.27), 1, 1);
+      }
     }
 
     // slow dashed rings, centred on the track
@@ -106,31 +115,27 @@ export class Backdrop {
     g.lineWidth = 1.2 * s;
     for (const [rf, dir, dash] of rings) {
       const r = Math.max(W, H) * rf * (1 + pulse * 0.012);
-      g.save();
-      g.translate(cx, cy); g.rotate(this.t * 0.05 * dir);
-      g.setLineDash(dash.map(d => d * s));
-      g.strokeStyle = rgba(THEME.accent, 0.1 + pulse * 0.06);
-      g.beginPath(); g.arc(0, 0, r, Math.PI, Math.PI * 2); g.stroke();
-      g.restore();
+      g.fillStyle = rgba(THEME.accent, 0.14 + pulse * 0.08);
+      const steps = Math.round(r * 0.35), rot = this.t * 0.05 * dir, every = dash[0] > 10 ? 3 : 2;
+      for (let i = 0; i < steps; i++) {
+        if (i % every) continue;
+        const a = Math.PI + (i / steps) * Math.PI + rot;
+        const yy = cy + Math.sin(a) * r;
+        if (yy < cy) g.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(yy), 1, 1);
+      }
     }
-    g.setLineDash([]);
 
     // drifting shapes
     for (const sh of this.shapes) {
       const x = sh.x * W - (playerX - 0.5) * 50 * s, y = sh.y * H, z = sh.size * s;
       if (y > trackY - 10) continue;
-      g.save();
-      g.translate(x, y); g.rotate(sh.rot);
-      g.globalAlpha = sh.a;
-      g.strokeStyle = g.fillStyle = THEME[sh.col];
-      g.lineWidth = 2 * s; g.lineCap = 'round';
-      g.beginPath();
-      if (sh.kind === 'plus') { g.moveTo(-z, 0); g.lineTo(z, 0); g.moveTo(0, -z); g.lineTo(0, z); g.stroke(); }
-      else if (sh.kind === 'tri') { g.moveTo(0, -z); g.lineTo(z * 0.9, z * 0.6); g.lineTo(-z * 0.9, z * 0.6); g.closePath(); g.stroke(); }
-      else if (sh.kind === 'ring') { g.arc(0, 0, z * 0.8, 0, Math.PI * 2); g.stroke(); }
-      else if (sh.kind === 'square') { g.strokeRect(-z * 0.7, -z * 0.7, z * 1.4, z * 1.4); }
-      else { g.arc(0, 0, z * 0.35, 0, Math.PI * 2); g.fill(); }
-      g.restore();
+      // little pixel glyphs that blink as they drift
+      g.globalAlpha = sh.a * (Math.sin(this.t * 2 + sh.rot * 3) > -0.6 ? 1 : 0.4);
+      g.fillStyle = THEME[sh.col];
+      const X = Math.round(x), Y = Math.round(y), q = Math.max(1, Math.round(z / 3));
+      const glyph = GLYPHS[sh.kind];
+      for (let gy = 0; gy < glyph.length; gy++) for (let gx = 0; gx < glyph[gy].length; gx++)
+        if (glyph[gy][gx] === '#') g.fillRect(X + (gx - 2) * q, Y + (gy - 2) * q, q, q);
     }
     g.globalAlpha = 1;
 
@@ -153,9 +158,10 @@ export class Backdrop {
     g.fillStyle = THEME.ground;
     g.fillRect(0, trackY, W, H - trackY);
     // faint lines on the ground, spreading from the centre
-    g.strokeStyle = rgba(THEME.accent, 0.08); g.lineWidth = 1;
+    g.fillStyle = rgba(THEME.accent, 0.12);
     for (let i = -8; i <= 8; i++) {
-      g.beginPath(); g.moveTo(W / 2 + i * 40 * s, trackY); g.lineTo(W / 2 + i * 160 * s, H); g.stroke();
+      const x0 = W / 2 + i * 40 * s, x1 = W / 2 + i * 160 * s, len = H - trackY;
+      for (let yy = 0; yy < len; yy += 2) g.fillRect(Math.round(x0 + (x1 - x0) * yy / len), Math.round(trackY + yy), 1, 1);
     }
 
     // bars that move with the music, standing on the ground
@@ -164,7 +170,8 @@ export class Backdrop {
       const h = this.bars[i] * (H - trackY) * 0.42 * this.barsA;
       if (h < 1) continue;
       g.fillStyle = rgba(i % 7 === 3 ? THEME.player : THEME.accent, 0.12 + this.bars[i] * 0.16);
-      g.fillRect(i * bw + bw * 0.22, H - h, bw * 0.56, h);
+      const bx = Math.round(i * bw + bw * 0.2), bwid = Math.max(1, Math.round(bw * 0.6));
+      for (let yy = 0; yy < h; yy += 3) g.fillRect(bx, Math.round(H - yy - 2), bwid, 2); // stacked blocks
     }
   }
 }

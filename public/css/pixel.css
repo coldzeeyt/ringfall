@@ -1,0 +1,77 @@
+/* ---------- Pixel art skin: square blocks, hard shadows, pixel fonts ---------- */
+html.pixel {
+&, body, button, input, select, textarea, label, kbd { font-family: "Pixelify Sans", monospace !important; }
+canvas#stage, #edCanvas, #pv { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+.logo, .logo span, .brand, .brand span, .grade, .wf-logo, h1, h2, .res-score, .lc-num, .lc-best .g, .slot .num,
+.hud-score span:last-child, .hud-combo span:first-child, .stats span, .ed-stats b {
+  font-family: "Press Start 2P", monospace !important; letter-spacing: 0 !important; font-weight: 400 !important;
+}
+.logo { font-size: clamp(30px, 6.4vw, 76px) !important; rotate: 0deg !important; line-height: 1.1 !important; }
+.logo .l1 { text-shadow: 6px 6px 0 var(--track), 6px 6px 0 #000 !important; }
+.logo .l2 { rotate: 0deg !important; translate: 0 0 !important; margin-left: .15em !important; text-shadow: 6px 6px 0 #3C3489 !important; }
+.brand { rotate: 0deg !important; font-size: 18px !important; } .brand .l2 { rotate: 0deg !important; translate: 0 0 !important; }
+.grade { font-size: 64px !important; rotate: 0deg !important; text-shadow: 6px 6px 0 #3C3489 !important; }
+.res-score { font-size: 26px !important; }
+.hud-score span:last-child, .hud-combo span:first-child { font-size: 20px !important; text-shadow: 3px 3px 0 rgba(0,0,0,.45); }
+.hud-label { letter-spacing: .08em !important; }
+h2, .panel-head h2 { font-size: 16px !important; }
+.wf-logo { font-size: 14px !important; }
+
+/* no glass, no rounding: chunky blocks */
+*, *::before, *::after { border-radius: 0 !important; }
+.glass, .panel, .level-card, .card, .ed-modal-body {
+  background: color-mix(in srgb, var(--bg2) 82%, #000) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  border: 4px solid #0b0822 !important;
+  box-shadow: inset 4px 4px 0 rgba(255,255,255,.10), inset -4px -4px 0 rgba(0,0,0,.28), 8px 8px 0 rgba(6,4,20,.85) !important;
+}
+.btn, .chip, .back, .pause-btn, .bind, .wf-tab.on, .ed-tools button.on, .seg button.on, .ed-seg button.on {
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  background: color-mix(in srgb, var(--violet) 45%, #1a1440) !important;
+  border: 3px solid #0b0822 !important;
+  box-shadow: inset 3px 3px 0 rgba(255,255,255,.18), inset -3px -3px 0 rgba(0,0,0,.3), 4px 4px 0 #0b0822 !important;
+  transition: none !important;
+}
+.btn:hover, .chip:hover, .back:hover, .bind:hover { transform: translate(-1px, -1px) !important; filter: brightness(1.15); }
+.btn:active, .chip:active, .back:active { transform: translate(3px, 3px) !important; box-shadow: inset 3px 3px 0 rgba(0,0,0,.35) !important; }
+.btn.primary, .chip.primary, .chip.install, .ed-top .chip.primary {
+  background: var(--pink) !important; color: #2a1438 !important;
+}
+.chip.danger.armed { background: #7a2440 !important; color: #fff !important; }
+.bind.add { background: transparent !important; border-style: dashed !important; box-shadow: none !important; }
+.ed-tools button { border: 3px solid transparent; }
+.ed-tools button.on { background: color-mix(in srgb, var(--pink) 35%, #1a1440) !important; }
+
+input:not([type=range]):not([type=color]):not([type=file]), select, textarea, .wf-search, .ed-title:focus {
+  border: 3px solid #0b0822 !important; background: #0f0b2a !important; box-shadow: inset 3px 3px 0 rgba(0,0,0,.4) !important;
+}
+
+/* square toggles and sliders */
+.toggle { border: 3px solid #0b0822 !important; height: 28px !important; }
+.toggle i { top: 2px !important; left: 2px !important; width: 18px !important; height: 18px !important; box-shadow: inset -2px -2px 0 rgba(0,0,0,.25); }
+.toggle.on i { transform: translateX(22px) !important; }
+input[type=range] { height: 8px !important; border: 2px solid #0b0822; }
+input[type=range]::-webkit-slider-thumb { width: 16px !important; height: 20px !important; border: 3px solid #0b0822 !important; box-shadow: none !important; }
+input[type=range]::-moz-range-thumb { width: 12px !important; height: 18px !important; border: 3px solid #0b0822 !important; }
+
+/* HUD bits */
+.key-pill { border: 3px solid #0b0822 !important; background: color-mix(in srgb, var(--bg2) 85%, #000) !important; box-shadow: 4px 4px 0 rgba(6,4,20,.8); }
+.progress, .hp { height: 8px !important; border: 2px solid #0b0822; background: #0f0b2a !important; }
+#progressFill, .hp i { background-image: repeating-linear-gradient(90deg, transparent 0 6px, rgba(0,0,0,.35) 6px 8px) !important; }
+#progressFill { background-color: var(--violet) !important; }
+.hp i { background-color: var(--teal) !important; } .hp.low i { background-color: var(--pink) !important; }
+.badge, .tag, .lc-diff { border: 2px solid #0b0822; }
+.lc-num { box-shadow: 0 0 0 4px #0b0822, 4px 4px 0 4px rgba(6,4,20,.8) !important; font-size: 16px !important; }
+.mod-thumb, .mcard .th, .ed-preset { border: 3px solid #0b0822; image-rendering: pixelated; }
+.mod-thumb img { image-rendering: pixelated; }
+.spinner { border-width: 6px !important; animation: spin 1s steps(8) infinite !important; }
+.screen.dim { background: repeating-linear-gradient(0deg, rgba(10,7,30,.7) 0 2px, rgba(10,7,30,.55) 2px 4px) !important; }
+.screen > * { transition: transform .25s steps(4) !important; }
+.screen { transition: opacity .2s steps(3) !important; }
+kbd { border: 2px solid var(--violet) !important; }
+}
+
+/* the moment you find it */
+body.glitch { animation: glitch .45s steps(5) forwards; }
+@keyframes glitch { 0% { filter: none; } 40% { filter: contrast(2) saturate(3) hue-rotate(90deg); transform: translateX(6px); } 100% { filter: brightness(3); opacity: 0; } }

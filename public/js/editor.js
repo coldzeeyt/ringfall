@@ -1,3 +1,5 @@
+const PIXEL = document.documentElement.classList.contains('pixel');
+const EF = PIXEL ? '"Pixelify Sans", monospace' : 'Rubik, sans-serif';
 // Ringfall level editor: chart notes on a timeline over the song's waveform,
 // add triggers (flip, mirror, music bars, background, speed), preview, playtest, save and share.
 import { THEME, BG_PRESETS, rgba } from './theme.js';
@@ -108,10 +110,11 @@ export class Editor {
   }
 
   resize() {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    const W = this.W = innerWidth, H = this.H = innerHeight;
-    this.cv.width = W * dpr; this.cv.height = H * dpr;
-    this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // drawn at half resolution and scaled up without smoothing, to match the game's pixels
+    const W = this.W = innerWidth, H = this.H = innerHeight, PX = PIXEL ? 2 : Math.min(devicePixelRatio || 1, 2) ** -1;
+    this.cv.width = Math.ceil(W / PX); this.cv.height = Math.ceil(H / PX);
+    this.g.setTransform(1 / PX, 0, 0, 1 / PX, 0, 0);
+    this.g.imageSmoothingEnabled = !PIXEL;
     const left = 100, right = W - (W > 980 ? 300 : 24);
     const avail = right - left;
     this.wfW = W > 1200 ? 132 : 96; this.trW = 84; const gap = 14;
@@ -455,7 +458,7 @@ export class Editor {
     // beat grid
     const tTop = this.tOfY(top - 10), tBot = this.tOfY(H);
     const b0 = Math.floor(this.bOfT(tBot) * this.snap) / this.snap, b1 = this.bOfT(tTop);
-    g.font = '600 11px Rubik, sans-serif'; g.textAlign = 'right';
+    g.font = '500 ' + (PIXEL ? 14 : 11) + 'px ' + EF; g.textAlign = 'right';
     for (let b = Math.max(0, b0); b <= b1; b += 1 / this.snap) {
       const y = Math.round(this.yOfT(this.tOfB(b))) + 0.5;
       const isBeat = Math.abs(b - Math.round(b)) < 1e-6, isBar = isBeat && Math.round(b) % 4 === 0;
@@ -541,7 +544,7 @@ export class Editor {
         g.fillStyle = p.background; g.fillRect(x + w - 18, y - 8, 7, 14);
         g.fillStyle = p.background2; g.fillRect(x + w - 11, y - 8, 7, 14);
       }
-      g.fillStyle = '#1b1438'; g.font = '700 10.5px Rubik, sans-serif';
+      g.fillStyle = '#1b1438'; g.font = '600 ' + (PIXEL ? 13 : 10.5) + 'px ' + EF;
       g.fillText(`${T.short} ${this.trigValueText(tr)}`, x + 6, y + 3.5);
       if (tr === selRef) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.roundRect(x - 2, y - 13, w + 4, 24, 8); g.stroke(); }
     }
@@ -560,7 +563,7 @@ export class Editor {
     g.restore();
 
     if (!this.buffer) {
-      g.fillStyle = 'rgba(206,203,246,0.7)'; g.font = '500 15px Rubik, sans-serif'; g.textAlign = 'center';
+      g.fillStyle = 'rgba(206,203,246,0.7)'; g.font = '500 ' + (PIXEL ? 18 : 15) + 'px ' + EF; g.textAlign = 'center';
       g.fillText(this.song && this.song.kind === 'file' ? 'Pick the song file to keep editing' : 'Loading song…', this.laneL + this.laneW / 2, H / 2);
     }
 
@@ -570,7 +573,7 @@ export class Editor {
     g.fillStyle = THEME.player; g.beginPath(); g.arc(this.wfL - 2, line, 4, 0, 7); g.fill();
 
     // lane headers
-    g.fillStyle = 'rgba(206,203,246,0.55)'; g.font = '600 11px Rubik, sans-serif'; g.textAlign = 'center';
+    g.fillStyle = 'rgba(206,203,246,0.55)'; g.font = '500 ' + (PIXEL ? 14 : 11) + 'px ' + EF; g.textAlign = 'center';
     g.fillText('SONG', this.wfL + this.wfW / 2, top - 16);
     g.fillText('NOTES', this.laneL + this.laneW / 2, top - 16);
     g.fillText('TRIGGERS', this.trL + this.trW / 2, top - 16);

@@ -2,7 +2,7 @@ import { settings, save, bindingLabel, primaryHitLabel, sameBinding, DEFAULT_BIN
 import { AudioEngine } from './audio.js';
 import { LEVELS, levelDuration, loadRemoteLevels, levelKey } from './levels.js';
 import { generateChart } from './chartgen.js';
-import { Game, DIFFICULTY } from './game.js';
+const { Game, DIFFICULTY } = await import(settings.pixel ? './game.js' : './game-classic.js');
 import { Input } from './input.js';
 import * as Mods from './mods.js';
 import { Editor } from './editor.js';
@@ -321,6 +321,27 @@ $('volume').addEventListener('input', e => { settings.volume = Number(e.target.v
 $('speed').addEventListener('input', e => { settings.speed = Number(e.target.value); save(); syncSettingsUI(); });
 $('offset').addEventListener('input', e => { settings.offsetMs = Number(e.target.value); save(); syncSettingsUI(); });
 $('hitsoundBtn').addEventListener('click', () => { settings.hitSounds = !settings.hitSounds; save(); syncSettingsUI(); });
+// ---- secret: 8-bit mode. Konami code on the main menu, or click the logo 8 times ----
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','KeyB','KeyA'];
+let konami = 0, logoClicks = 0, logoTimer = 0;
+function togglePixel() {
+  settings.pixelFound = true; settings.pixel = !settings.pixel; save();
+  document.body.classList.add('glitch');
+  setTimeout(() => location.reload(), 450);
+}
+addEventListener('keydown', e => {
+  if (!$('screen-menu').classList.contains('active')) { konami = 0; return; }
+  konami = e.code === KONAMI[konami] ? konami + 1 : (e.code === KONAMI[0] ? 1 : 0);
+  if (konami === KONAMI.length) { konami = 0; togglePixel(); }
+}, true);
+document.querySelector('#screen-menu .logo').addEventListener('click', () => {
+  clearTimeout(logoTimer); logoTimer = setTimeout(() => logoClicks = 0, 1500);
+  if (++logoClicks >= 8) { logoClicks = 0; togglePixel(); }
+});
+$('pixelRow').hidden = !settings.pixelFound;
+$('pixelBtn').classList.toggle('on', settings.pixel);
+$('pixelBtn').addEventListener('click', togglePixel);
+
 $('penBtn').addEventListener('click', () => { settings.penTipHits = !settings.penTipHits; save(); syncSettingsUI(); });
 $('resetBindsBtn').addEventListener('click', () => { settings.bindings = structuredClone(DEFAULT_BINDINGS); save(); syncSettingsUI(); });
 

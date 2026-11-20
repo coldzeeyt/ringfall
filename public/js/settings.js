@@ -15,6 +15,8 @@ const defaults = {
   bindings: structuredClone(DEFAULT_BINDINGS),
   penTipHits: true,     // drawing pad: touching the tablet = hit, hovering = move
   difficulty: 'normal', // easy | normal | hard
+  pixelFound: false,    // secret: found the 8-bit mode
+  pixel: false,
   volume: 0.8,
   speed: 1.0,
   offsetMs: 0,
