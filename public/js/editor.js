@@ -98,7 +98,7 @@ export class Editor {
     }
     if (!this.loaded) {
       this.loaded = true;
-      if (!this.loadDraft()) await this.loadLevel(this.builtInTemplate(true));
+      if (!this.loadDraft()) await this.loadLevel(this.builtInTemplate(false)); // start with an empty chart
     }
   }
 
@@ -201,6 +201,9 @@ export class Editor {
     let d;
     try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { }
     if (!d || !d.song) return false;
+    // an old auto-saved draft that's just the untouched Test Level counts as no draft
+    const t = this.builtInTemplate(true);
+    if (d.meta?.title === t.title && (d.notes || []).length === t.notes.length && (d.triggers || []).length === t.triggers.length) return false;
     this.meta = d.meta; this.notes = d.notes || []; this.triggers = d.triggers || [];
     if (d.song.kind === 'file') {
       this.song = d.song;
