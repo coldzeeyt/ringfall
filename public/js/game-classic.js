@@ -365,7 +365,55 @@ export class Game {
     this.bursts = this.bursts.filter(b => b.a > 0);
 
     this.draw(t, pulse);
+    if (t !== null && this.mode === 'play') this.drawWarnings(t, pulse);
     requestAnimationFrame(tt => this.frame(tt));
+  }
+
+  // Heads-up before the track flips or swaps sides: arrows blink in for the last two beats.
+  drawWarnings(t, pulse) {
+    const lead = Math.max(0.7, this.spb * 2), fx = this.fx;
+    let flip = null, mirror = null;
+    for (let i = this.trigIdx; i < this.triggers.length; i++) {
+      const tr = this.triggers[i], left = tr.t - t;
+      if (left > lead) break;
+      if (tr.type === 'flip' && !flip && (tr.value ? 1 : 0) !== fx.flipTo) flip = left;
+      if (tr.type === 'mirror' && !mirror && (tr.value ? 1 : 0) !== fx.mirrorTo) mirror = left;
+    }
+    if (flip === null && mirror === null) return;
+    const g = this.g, s = this.s, cx = (this.trackL + this.trackR) / 2, ty = this.trackY;
+    const z = Math.max(5, Math.round(15 * s));
+    const tri = (x, y, dir) => { // solid triangle made of rows, pointing up/down/left/right
+      x = Math.round(x); y = Math.round(y);
+      for (let i = 0; i < z; i++) {
+        const w = i * 2 + 1;
+        if (dir === 'up') g.fillRect(x - i, y - z + i, w, 1);
+        else if (dir === 'down') g.fillRect(x - i, y + z - i, w, 1);
+        else if (dir === 'left') g.fillRect(x - z + i, y - i, 1, w);
+        else g.fillRect(x + z - i, y - i, 1, w);
+      }
+    };
+    const show = (left, draw) => {
+      const k = 1 - left / lead;                       // 0 → 1 as the switch gets closer
+      g.globalAlpha = (0.6 + k * 0.4) * (0.7 + pulse * 0.3);
+      g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowOffsetX = g.shadowOffsetY = Math.max(1, Math.round(2 * s));
+      draw(k);
+    };
+    g.save(); g.textAlign = 'center'; g.font = `800 ${Math.round(24 * this.s)}px ${FONT}`;
+    const y0 = ty - 170 * s;
+    if (flip !== null) show(flip, k => {
+      g.fillStyle = '#fff';
+      const gap = (12 + k * 8) * s;
+      tri(cx, y0 - gap, 'up'); tri(cx, y0 + gap, 'down');
+      g.fillText('FLIP', cx, y0 + gap + z + 26 * s);
+    });
+    if (mirror !== null) show(mirror, k => {
+      g.fillStyle = COL.yellow;
+      const y = flip !== null ? y0 + 70 * s : y0, gap = (14 + k * 8) * s;
+      tri(cx - gap, y, 'left'); tri(cx + gap, y, 'right');
+      tri(this.trackL - 4 * s, ty, 'left'); tri(this.trackR + 4 * s, ty, 'right'); // ends of the track
+      g.fillText('SWAP', cx, y + z + 26 * s);
+    });
+    g.restore();
   }
 
   updateMenu(dt) {
