@@ -63,8 +63,10 @@ export class Game {
     this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const pfW = Math.min(this.W * 0.92, 640);
     this.s = clamp(Math.min(pfW / 360, this.H / 520), 0.85, 1.9);
-    this.trackL = (this.W - pfW) / 2 + 12 * this.s;
-    this.trackR = (this.W + pfW) / 2 - 12 * this.s;
+    this.pfW = pfW;
+    this.menuW = Math.max(pfW, Math.min(this.W * 0.94, 1040)); // menus get a longer line so every label fits
+    this.wide ??= 1;
+    this.layoutTrack();
     this.trackY = Math.round(this.H * 0.74);
     this.R = 26 * this.s;        // ring radius (hit zone)
     this.PR = 18 * this.s;       // player circle radius
@@ -124,7 +126,7 @@ export class Game {
     const kind = bestDt <= this.win.perfect ? 'perfect' : 'good';
     if (best.hold) { best.state = 1; this.holding = best; }
     else best.state = 2;
-    this.judge(kind);
+    this.judge(kind, t > best.t);
     this.audio.hitSound(kind);
     this.bursts.push({ x: this.nx(best.x), r: this.R, a: 0.9, col: kind === 'perfect' ? COL.tealLt : COL.yellow });
   }
@@ -181,7 +183,7 @@ export class Game {
     this.trigIdx = 0;
     this.applyTriggers(from - 0.001, true);
     this.duration = duration;
-    this.stats = { score: 0, combo: 0, maxCombo: 0, perfect: 0, good: 0, miss: 0 };
+    this.stats = { score: 0, combo: 0, maxCombo: 0, perfect: 0, good: 0, miss: 0, early: 0, late: 0 };
     this.holding = null; this.fill = 0; this.keyDown = false; this.held.clear();
     this.particles = []; this.popups = []; this.bursts = []; this.portals = [];
     this.mode = 'play';
@@ -248,7 +250,7 @@ export class Game {
 
   mult() { return 1 + Math.min(this.stats.combo, 100) / 100; }
 
-  judge(kind) {
+  judge(kind, late) {
     const st = this.stats;
     if (kind === 'miss') {
       st.miss++; const had = st.combo; st.combo = 0;
@@ -263,7 +265,8 @@ export class Game {
     this.hooks.onHealth?.(Math.max(0, this.hp), this.noFail);
     if (this.hp <= 0 && this.mode === 'play') this.fail();
     this.hooks.onScore(st.score);
-    const text = { perfect: 'PERFECT', good: 'GOOD', miss: 'MISS' }[kind];
+    if (kind === 'good' && late !== undefined) st[late ? 'late' : 'early']++;
+    const text = kind === 'good' && late !== undefined ? (late ? 'LATE' : 'EARLY') : { perfect: 'PERFECT', good: 'GOOD', miss: 'MISS' }[kind];
     const col = { perfect: COL.tealLt, good: COL.yellow, miss: COL.pink }[kind];
     this.popups.push({ x: this.px, y: this.trackY - this.R - 30 * this.s, text, col, life: 0.6, max: 0.6 });
   }
@@ -321,7 +324,18 @@ export class Game {
   }
 
   // ---------------- loop ----------------
+  layoutTrack() {
+    const w = this.pfW + (this.menuW - this.pfW) * this.wide;
+    this.trackL = (this.W - w) / 2 + 12 * this.s;
+    this.trackR = (this.W + w) / 2 - 12 * this.s;
+  }
+
   frame(now) {
+    const wantWide = this.mode === 'menu' || this.mode === 'levels' ? 1 : 0;
+    if (this.wide !== wantWide) {
+      this.wide += Math.sign(wantWide - this.wide) * Math.min(Math.abs(wantWide - this.wide), 0.06);
+      this.layoutTrack();
+    }
     const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now;
     const keyMove = (this.moveHeld.right.size ? 1 : 0) - (this.moveHeld.left.size ? 1 : 0);
     if (keyMove) this.target = clamp(this.target + keyMove * dt * 1.6, 0, 1);

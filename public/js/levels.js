@@ -58,6 +58,38 @@ function testChart() {
   ];
 }
 
+// Level 2: faster, wider jumps, streams, and the screen turning on you.
+function overdriveChart() {
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const n = [];
+  const jump = (b, a, c) => { n.push(tap(b, a)); n.push(tap(b + 1, c)); };
+  // bars 1–4: every beat, side to side
+  for (let b = 4; b < 20; b += 2) jump(b, b % 4 ? .15 : .85, .5);
+  // bars 5–8: eighth-note streams that sweep across the track
+  for (let b = 20; b < 36; b += 0.5) {
+    if (b % 8 >= 6) { if (b % 8 === 6) n.push(hold(b, b % 16 < 8 ? .2 : .8, 1.5)); continue; }
+    n.push(tap(b, .5 + Math.sin(b * 0.9) * .38));
+  }
+  // bars 9–12: doubles (two quick hits) jumping around
+  for (let b = 36; b < 52; b += 1) {
+    const x = .15 + rnd() * .7;
+    n.push(tap(b, x)); if (b % 2 === 1) n.push(tap(b + 0.25, Math.min(.9, x + .08)));
+  }
+  // bars 13–16: breakdown, long ribbons with taps between them
+  [[52, .2, 3], [56, .8, 3], [60, .35, 2], [63, .65, 2]].forEach(([b, x, l]) => { n.push(hold(b, x, l)); n.push(tap(b + l + .5, 1 - x)); });
+  n.push(tap(66, .5)); n.push(tap(67, .5));
+  // bars 17–30: full speed, streams with big jumps every bar
+  for (let b = 68; b < 124; b += 0.5) {
+    const inBar = b % 4;
+    if (b % 16 === 14) { n.push(hold(b, b % 32 < 16 ? .15 : .85, 1.5)); b += 1.5; continue; }
+    if (inBar === 0) n.push(tap(b, rnd() < .5 ? .1 : .9));
+    else n.push(tap(b, .5 + Math.sin(b * 1.3) * .32 + (rnd() - .5) * .1));
+  }
+  // ending
+  n.push(hold(124, .5, 4)); n.push(tap(129, .2)); n.push(tap(130, .8)); n.push(tap(131, .5));
+  return n;
+}
+
 export const LEVELS = [
   {
     slot: 1,
@@ -74,7 +106,26 @@ export const LEVELS = [
       trig(84, 'flip', false, 0.75), trig(84, 'background', 'night', 2),
     ],
   },
-  { slot: 2, title: 'Level 2', locked: true },
+  {
+    slot: 2,
+    title: 'Overdrive',
+    artist: 'Built-in beat',
+    bpm: 150,
+    offset: 0,
+    music: null,
+    beats: 132,
+    style: 'drive',      // harder synth: kick on every beat, different chords
+    hard: true,
+    notes: overdriveChart(),
+    triggers: [
+      trig(4, 'background', 'ember', 2),
+      trig(36, 'mirror', true, 0.5), trig(52, 'mirror', false, 0.5),
+      trig(52, 'background', 'storm', 2), trig(52, 'bars', false),
+      trig(68, 'background', 'sunset', 1), trig(68, 'bars', true), trig(68, 'speed', 1.25, 1),
+      trig(84, 'flip', true, 1), trig(100, 'flip', false, 1), trig(100, 'mirror', true, 0.5),
+      trig(116, 'mirror', false, 0.5), trig(116, 'background', 'deep', 2), trig(124, 'speed', 1, 2),
+    ],
+  },
   { slot: 3, title: 'Level 3', locked: true },
 ];
 

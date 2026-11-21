@@ -21,7 +21,11 @@ const hud = $('hud'), scoreEl = $('score'), comboEl = $('combo'), comboBox = com
 const fmt = n => Math.round(n).toLocaleString('en-US');
 
 const game = new Game($('stage'), audio, {
-  onScore: s => { scoreEl.textContent = fmt(s); },
+  onScore: s => {
+    scoreEl.textContent = fmt(s);
+    const st = game.stats, judged = st.perfect + st.good + st.miss;
+    $('accLive').textContent = (judged ? (st.perfect + st.good * 0.6) / judged * 100 : 100).toFixed(1) + '%';
+  },
   onCombo: (c, bump) => {
     comboEl.textContent = c;
     if (bump && c > 0) { comboBox.classList.remove('bump'); void comboBox.offsetWidth; comboBox.classList.add('bump'); }
@@ -57,6 +61,11 @@ const input = new Input($('stage'), {
   },
   key: e => {
     if (e.code === 'Tab' && screen === 'levels') { e.preventDefault(); cycleDifficulty(); return; }
+    if (e.repeat) return;
+    const bound = code => JSON.stringify(settings.bindings).includes('"' + code + '"');
+    if (e.code === 'KeyP' && screen === 'levels' && !bound('KeyP')) { practice = !practice; syncPractice(); audio.ensure(); audio.hitSound('good'); return; }
+    if (e.code === 'KeyR' && !bound('KeyR') && !playtesting && ['play', 'pause', 'results'].includes(screen)) { restart(); return; }
+    if (e.code === 'KeyF' && !bound('KeyF') && screen !== 'editor') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); return; }
     if (e.code !== 'Escape') return;
     if (screen === 'editor') return;
     if (screen === 'play' && playtesting) { game.quit(); endPlaytest(null); return; }
@@ -161,6 +170,7 @@ function updateLevelCard(p) {
   $('lcTitle').textContent = lv.locked ? 'Coming soon' : lv.title;
   const meta = [];
   if (!lv.locked) {
+    if (lv.hard) meta.push('★ Hard');
     if (lv.modName) meta.push('from ' + lv.modName);
     else if (lv.artist) meta.push(lv.artist);
     meta.push(lv.bpm + ' BPM');
@@ -200,16 +210,35 @@ async function startLevel(level) {
   }
   show('play');
   $('progressFill').style.width = '0%';
-  game.start(level, buffer, duration);
+  $('practiceTag').classList.toggle('show', practice);
+  $('accLive').textContent = '100.0%';
+  game.start(level, buffer, duration, { noFail: practice });
 }
 
+// Practice: no health bar, no best scores saved. Toggle with P on the level screen.
+let practice = false, countdownTimer = 0;
+function syncPractice() { $('practiceHint').textContent = practice ? 'Practice ON' : 'Practice off'; }
 function pause() {
+  clearTimeout(countdownTimer); $('countdown').classList.remove('go');
   if (screen !== 'play') return;
   if (playtesting) { game.quit(); endPlaytest(null); return; }
-  game.pause(); show('pause');
+  if (game.mode === 'play') game.pause();
+  if (game.mode === 'paused') show('pause'); // also covers Esc during the countdown
 }
-function resume() { show('play'); game.resume(); }
-function restart() { game.quit(); startLevel(currentLevel); }
+// unpausing counts you back in so you're not thrown straight into notes
+function resume() {
+  show('play');
+  const el = $('countdown');
+  const step = n => {
+    if (screen !== 'play') return;
+    if (n === 0) { el.classList.remove('go'); game.resume(); return; }
+    el.textContent = n; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+    audio.tick?.(audio.ctx.currentTime, n === 1);
+    countdownTimer = setTimeout(() => step(n - 1), 500);
+  };
+  step(3);
+}
+function restart() { clearTimeout(countdownTimer); game.quit(); startLevel(currentLevel); }
 function quit() { game.quit(); show('levels'); }
 
 $('pauseBtn').addEventListener('click', pause);
@@ -218,6 +247,7 @@ $('restartBtn').addEventListener('click', restart);
 $('quitBtn').addEventListener('click', quit);
 $('retryBtn').addEventListener('click', restart);
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+addEventListener('blur', () => pause()); // clicking off the window pauses too
 
 const bestKey = lv => levelKey(lv) + ':' + settings.difficulty;
 let hoveredPortal = null;
@@ -250,17 +280,18 @@ function showResults(st) {
   const g = st.failed ? 'F' : grade(acc, st.miss);
   const key = bestKey(currentLevel);
   const prev = settings.best[key];
-  const isBest = !st.failed && (!prev || st.score > prev.score);
+  const isBest = !practice && !st.failed && (!prev || st.score > prev.score);
   if (isBest) { settings.best[key] = { score: Math.round(st.score), grade: g, acc }; save(); }
   $('failed').classList.toggle('show', !!st.failed);
   $('grade').textContent = g;
-  $('resTitle').textContent = `${currentLevel.title} · ${DIFFICULTY[settings.difficulty].label}`;
+  $('resTitle').textContent = `${currentLevel.title} · ${DIFFICULTY[settings.difficulty].label}${practice ? ' · Practice' : ''}`;
   $('resScore').textContent = fmt(st.score);
   $('newBest').classList.toggle('show', isBest && st.score > 0);
   $('resAcc').textContent = (acc * 100).toFixed(1) + '%';
   $('resCombo').textContent = st.maxCombo;
   $('resPerfect').textContent = st.perfect;
   $('resGood').textContent = st.good;
+  $('resEL').textContent = st.good ? `${st.early || 0} early · ${st.late || 0} late` : '';
   $('resMiss').textContent = st.miss;
   show('results');
 }

@@ -20,7 +20,9 @@
 <div id="hud" class="hud">
   <div class="hud-score"><span class="hud-label">Score</span><span id="score">0</span><div class="hp" id="hp"><i id="hpFill"></i></div></div>
   <button id="pauseBtn" class="pause-btn" aria-label="Pause"><span></span><span></span></button>
-  <div class="hud-combo"><span id="combo">0</span><span class="hud-label">combo</span></div>
+  <div class="hud-combo"><span id="combo">0</span><span class="hud-label">combo</span><span id="accLive" class="hud-label acc-live">100.0%</span></div>
+  <div id="countdown" class="countdown"></div>
+  <div id="practiceTag" class="practice-tag">Practice</div>
   <div class="hud-bottom">
     <div id="keyPill" class="key-pill">Hit: Space</div>
     <div class="progress"><div id="progressFill"></div></div>
@@ -43,7 +45,7 @@
     </div>
     <div class="lc-best"><div class="g" id="lcGrade"></div><div class="s" id="lcScore"></div></div>
   </div>
-  <div class="world-hint"><span class="key-pill"><b data-keylabel>Space</b> to play · <b>Tab</b> <span id="diffHint">Normal</span> · Esc back</span></div>
+  <div class="world-hint"><span class="key-pill"><b data-keylabel>Space</b> to play · <b>Tab</b> <span id="diffHint">Normal</span> · <b>P</b> <span id="practiceHint">Practice off</span> · Esc back</span></div>
 </section>
 
 <!-- Settings -->
@@ -216,7 +218,7 @@
     <h2 class="center">Paused</h2>
     <nav class="menu">
       <button class="btn primary" id="resumeBtn">Resume</button>
-      <button class="btn" id="restartBtn">Restart</button>
+      <button class="btn" id="restartBtn">Restart <kbd>R</kbd></button>
       <button class="btn" id="quitBtn">Quit</button>
     </nav>
   </div>
@@ -238,11 +240,11 @@
       <div><span id="resAcc">0%</span><label>Accuracy</label></div>
       <div><span id="resCombo">0</span><label>Max combo</label></div>
       <div><span id="resPerfect" class="c-perfect">0</span><label>Perfect</label></div>
-      <div><span id="resGood" class="c-good">0</span><label>Good</label></div>
+      <div><span id="resGood" class="c-good">0</span><label>Good <small id="resEL"></small></label></div>
       <div><span id="resMiss" class="c-miss">0</span><label>Miss</label></div>
     </div>
     <nav class="menu row-menu">
-      <button class="btn primary" id="retryBtn">Retry</button>
+      <button class="btn primary" id="retryBtn">Retry <kbd>R</kbd></button>
       <button class="btn" data-go="levels">Levels</button>
     </nav>
   </div>

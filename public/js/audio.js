@@ -2,6 +2,11 @@
 // and gives the game one clock to sync notes against.
 import { settings } from './settings.js';
 
+// darker progression for Overdrive
+const DRIVE_CHORDS = [
+  { bass: 33, notes: [57, 60, 64] }, { bass: 29, notes: [53, 57, 60] },
+  { bass: 31, notes: [55, 59, 62] }, { bass: 28, notes: [52, 56, 59] },
+];
 const CHORDS = [ // per bar, 4-bar loop (Am F C G)
   { bass: 45, notes: [57, 60, 64] },
   { bass: 41, notes: [57, 60, 65] },
@@ -76,7 +81,7 @@ export class AudioEngine {
     } else {
       const spb = 60 / level.bpm;
       const first = Math.max(0, Math.ceil((from - (level.offset || 0)) / (spb / 4)));
-      this.synth = { spb, offset: level.offset || 0, step: first, steps: Math.round(level.beats * 4) + 1 };
+      this.synth = { spb, offset: level.offset || 0, step: first, steps: Math.round(level.beats * 4) + 1, style: level.style };
       this.timer = setInterval(() => this.schedule(), 25);
       this.schedule();
     }
@@ -111,7 +116,8 @@ export class AudioEngine {
   playStep(step, when, sd, s) {
     const beat = Math.floor(step / 4), sub = step % 4;
     const bar = Math.floor(beat / 4), bib = beat % 4;
-    const chord = CHORDS[bar % 4];
+    const drive = s.style === 'drive';
+    const chord = (drive ? DRIVE_CHORDS : CHORDS)[bar % 4];
     const last = s.steps - 1;
 
     if (step === last) { this.crash(when); this.kick(when); return; }
@@ -124,7 +130,7 @@ export class AudioEngine {
     if (sub === 0) {
       if (intro) { if (bib === 0) this.kick(when); }
       else if (breakdown) { if (bib === 0) this.kick(when, 0.6); }
-      else if (bib === 0 || bib === 2 || (bar >= 17 && bib === 3)) this.kick(when);
+      else if (drive || bib === 0 || bib === 2 || (bar >= 17 && bib === 3)) this.kick(when);
       if (full && (bib === 1 || bib === 3)) this.snare(when);
     }
     if (bar >= 17 && step % 16 === 14) this.snare(when, 0.25);
@@ -232,7 +238,7 @@ export class AudioEngine {
     tmp.noise = off.createBuffer(1, sr, sr);
     const d = tmp.noise.getChannelData(0);
     for (let i = 0; i < sr; i++) d[i] = Math.random() * 2 - 1;
-    const s = { spb, offset: level.offset || 0, step: 0, steps: Math.round(level.beats * 4) + 1 };
+    const s = { spb, offset: level.offset || 0, step: 0, steps: Math.round(level.beats * 4) + 1, style: level.style };
     for (let i = 0; i < s.steps; i++) tmp.playStep(i, s.offset + i * spb / 4 + 0.001, spb / 4, s);
     return await off.startRendering();
   }

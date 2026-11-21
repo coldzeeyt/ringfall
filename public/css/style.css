@@ -416,3 +416,15 @@ input[type=range]::-moz-range-thumb {
 .lc-diff { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(127,119,221,.25); color: var(--white); vertical-align: 2px; }
 .lc-diff.hard { background: rgba(237,147,177,.25); color: var(--pink); }
 .lc-diff.easy { background: rgba(93,202,165,.2); color: var(--teal-lt); }
+
+/* quality of life */
+.acc-live { margin-top: 2px; opacity: .6; }
+.countdown { position: absolute; left: 50%; top: 40%; translate: -50% -50%; font-size: 96px; font-weight: 800; color: var(--white);
+  text-shadow: 5px 5px 0 var(--track); opacity: 0; pointer-events: none; }
+.countdown.go { animation: cd .5s ease-out; }
+@keyframes cd { from { opacity: 1; scale: 1.4; } to { opacity: .0; scale: .9; } }
+.practice-tag { position: absolute; top: 18px; left: 50%; translate: -50% 0; margin-left: 70px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--teal); border: 1px solid currentColor; padding: 3px 10px; border-radius: 99px; display: none; }
+.practice-tag.show { display: block; }
+#resEL { opacity: .6; font-size: .85em; }
+.btn kbd { font-size: .75em; opacity: .7; margin-left: 6px; }
